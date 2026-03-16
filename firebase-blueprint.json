@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Maintenance Report",
+      "description": "Technical maintenance report for medical devices",
+      "type": "object",
+      "properties": {
+        "reportNumber": { "type": "string" },
+        "type": { "type": "string", "enum": ["preventive", "corrective"] },
+        "dateReceived": { "type": "string" },
+        "dateService": { "type": "string" },
+        "responsible": { "type": "string" },
+        "equipment": { "type": "string" },
+        "model": { "type": "string" },
+        "brand": { "type": "string" },
+        "serial": { "type": "string" },
+        "invima": { "type": "string" },
+        "location": { "type": "string" },
+        "mode": { "type": "string" },
+        "isMobile": { "type": "boolean" },
+        "isFixed": { "type": "boolean" },
+        "maintenanceSubtype": { "type": "string" },
+        "description": { "type": "string" },
+        "technicalDiagnosis": { "type": "string" },
+        "workPerformed": { "type": "string" },
+        "spareParts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "provider": { "type": "string" },
+              "partNumber": { "type": "string" },
+              "reference": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
+        "verification": { "type": "object" },
+        "finalDiagnosis": { "type": "string" },
+        "finalStatus": { "type": "string" },
+        "observations": { "type": "string" },
+        "delivery": {
+          "type": "object",
+          "properties": {
+            "senderName": { "type": "string" },
+            "senderSignature": { "type": "string" },
+            "receiverName": { "type": "string" },
+            "receiverSignature": { "type": "string" }
+          }
+        },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reportNumber", "type", "equipment", "serial"]
+    },
+    "Counter": {
+      "title": "Report Counter",
+      "description": "Counter for auto-incrementing report numbers",
+      "type": "object",
+      "properties": {
+        "preventive": { "type": "integer" },
+        "corrective": { "type": "integer" }
+      }
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of maintenance reports"
+    },
+    "/counters/reports": {
+      "schema": "Counter",
+      "description": "Singleton for report counters"
+    }
+  }
+}

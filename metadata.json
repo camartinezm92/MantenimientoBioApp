@@ -1,0 +1,5 @@
+{
+  "name": "UCI Honda - Gestión Biomédica",
+  "description": "Aplicación técnica para reportes de mantenimiento de dispositivos médicos con integración de IA y generación de PDF.",
+  "requestFramePermissions": []
+}
