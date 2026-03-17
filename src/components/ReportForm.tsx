@@ -575,10 +575,46 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
               >
                 <option value="">Seleccione...</option>
                 <option value="MONITOR DE SIGNOS VITALES">MONITOR DE SIGNOS VITALES</option>
-                <option value="VENTILADOR MECANICO">VENTILADOR MECANICO</option>
-                <option value="BOMBA DE INFUSION">BOMBA DE INFUSION</option>
+                <option value="VENTILADOR MECÁNICO">VENTILADOR MECÁNICO</option>
+                <option value="CAMA">CAMA</option>
+                <option value="CAMILLA">CAMILLA</option>
+                <option value="TAC">TAC</option>
+                <option value="FLUJÓMETROS">FLUJÓMETROS</option>
+                <option value="SUCCIONADORES">SUCCIONADORES</option>
+                <option value="BOMBAS DE INFUSIÓN">BOMBAS DE INFUSIÓN</option>
+                <option value="EQUIPO DE ÓRGANOS">EQUIPO DE ÓRGANOS</option>
+                <option value="TENSIÓMETRO">TENSIÓMETRO</option>
+                <option value="REGULADOR DE VACÍO">REGULADOR DE VACÍO</option>
+                <option value="LARINGOSCOPIO">LARINGOSCOPIO</option>
                 <option value="DESFIBRILADOR">DESFIBRILADOR</option>
-                <option value="ELECTROCARDIOGRAFO">ELECTROCARDIOGRAFO</option>
+                <option value="ELECTROCARDIÓ-GRAFO">ELECTROCARDIÓ-GRAFO</option>
+                <option value="MÁQUINA DE GASES">MÁQUINA DE GASES</option>
+                <option value="MÁQUINA DE ANESTESIA">MÁQUINA DE ANESTESIA</option>
+                <option value="MESA DE CIRUGÍA">MESA DE CIRUGÍA</option>
+                <option value="LÁMPARA CIELÍTICA">LÁMPARA CIELÍTICA</option>
+                <option value="ELECTROBISTURÍ">ELECTROBISTURÍ</option>
+                <option value="GLUCÓMETROS">GLUCÓMETROS</option>
+                <option value="AUTOCLAVE">AUTOCLAVE</option>
+                <option value="INCUBADORA">INCUBADORA</option>
+                <option value="FONENDOSCOPIOS">FONENDOSCOPIOS</option>
+                <option value="DIGITALIZADOR">DIGITALIZADOR</option>
+                <option value="EQUIPO DE RAYOS X PORTÁTIL">EQUIPO DE RAYOS X PORTÁTIL</option>
+                <option value="COLCHONES ANTIESCARAS">COLCHONES ANTIESCARAS</option>
+                <option value="BÁSCULA">BÁSCULA</option>
+                <option value="TALLÍMETRO">TALLÍMETRO</option>
+                <option value="SILLAS DE RUEDAS">SILLAS DE RUEDAS</option>
+                <option value="EQUIPO DE HEMATOLOGÍA">EQUIPO DE HEMATOLOGÍA</option>
+                <option value="EQUIPO DE QUÍMICA">EQUIPO DE QUÍMICA</option>
+                <option value="CENTRÍFUGAS">CENTRÍFUGAS</option>
+                <option value="PIPETAS AUTOMÁTICAS">PIPETAS AUTOMÁTICAS</option>
+                <option value="BAÑO SEROLÓGICO">BAÑO SEROLÓGICO</option>
+                <option value="MICROSCOPIO">MICROSCOPIO</option>
+                <option value="AGITADOR DE PLAQUETAS">AGITADOR DE PLAQUETAS</option>
+                <option value="LÁMPARA DE BANCO DE SANGRE">LÁMPARA DE BANCO DE SANGRE</option>
+                <option value="TERMÓMETRO DIGITAL">TERMÓMETRO DIGITAL</option>
+                <option value="TERMOHIGRÓMETROS">TERMOHIGRÓMETROS</option>
+                <option value="REFRIGERADORES">REFRIGERADORES</option>
+                <option value="CONGELADOR">CONGELADOR</option>
               </select>
             )}
           </div>
@@ -622,11 +658,21 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
             <div className="col-span-2 border-r-2 border-b-2 border-[#003366] p-2 font-bold uppercase bg-[#f0f7ff] text-[#003366]">Invima</div>
           <div className="col-span-4 border-r-2 border-b-2 border-[#003366] p-2 text-black font-semibold">
             {isViewOnly ? formData.invima : (
-              <input 
+              <select 
                 value={formData.invima} 
                 onChange={e => setFormData(prev => ({ ...prev, invima: e.target.value }))}
                 className="w-full border-none p-0 focus:ring-0 text-[10px] bg-transparent font-semibold"
-              />
+              >
+                    <option value="">pendiente!...</option>
+                    <option value="UNIDAD DE CUIDADOS INTENSIVOS O INTERMEDIOS">UNIDAD DE CUIDADOS INTENSIVOS O INTERMEDIOS</option>
+                    <option value="ESTERILIZACION">ESTERILIZACION</option>
+                    <option value="LABORATORIO">LABORATORIO</option>
+                    <option value="HOSPITALIZACION">HOSPITALIZACION</option>
+                    <option value="CONSULTA EXTERNA">CONSULTA EXTERNA</option>
+                    <option value="IMAGENES DIAGNOSTICAS">IMAGENES DIAGNOSTICAS</option>
+                    <option value="CIRUGIA">CIRUGIA</option>
+                </select>
+        
             )}
           </div>
           <div className="col-span-2 border-r-2 border-b-2 border-[#003366] p-2 font-bold uppercase bg-[#f0f7ff] text-[#003366] text-center">Modo</div>
@@ -647,9 +693,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
                 className="w-full border-none p-0 focus:ring-0 text-[10px] bg-transparent font-semibold"
               >
                 <option value="">Seleccione...</option>
-                <option value="UNIDAD DE CUIDADOS INTENSIVOS">UNIDAD DE CUIDADOS INTENSIVOS</option>
-                <option value="URGENCIAS">URGENCIAS</option>
+                <option value="UNIDAD DE CUIDADOS INTENSIVOS O INTERMEDIOS">UNIDAD DE CUIDADOS INTENSIVOS O INTERMEDIOS</option>
+                <option value="ESTERILIZACION">ESTERILIZACION</option>
+                <option value="LABORATORIO">LABORATORIO</option>
                 <option value="HOSPITALIZACION">HOSPITALIZACION</option>
+                <option value="CONSULTA EXTERNA">CONSULTA EXTERNA</option>
+                <option value="IMAGENES DIAGNOSTICAS">IMAGENES DIAGNOSTICAS</option>
                 <option value="CIRUGIA">CIRUGIA</option>
               </select>
             )}
