@@ -42,6 +42,7 @@ interface ReportFormProps {
 
 export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData, isViewOnly, autoDownload }) => {
   const [loading, setLoading] = useState(false);
+  const isMounted = useRef(true);
   const [reportType, setReportType] = useState<MaintenanceType | null>(initialData?.type || null);
   const [reportNumber, setReportNumber] = useState(initialData?.reportNumber || '');
   const [formData, setFormData] = useState<Partial<Report>>(initialData || {
@@ -80,6 +81,13 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (reportType && !initialData) {
       generateReportNumber(reportType);
     }
@@ -96,22 +104,35 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
   }, [autoDownload, initialData]);
 
   const generateReportNumber = async (type: MaintenanceType) => {
-    const counterRef = doc(db, 'counters', 'reports');
-    const counterSnap = await getDoc(counterRef);
-    
-    let count = 1;
-    if (counterSnap.exists()) {
-      count = (counterSnap.data()[type] || 0) + 1;
-    } else {
-      await setDoc(counterRef, { preventive: 0, corrective: 0 });
+    try {
+      const counterRef = doc(db, 'counters', 'reports');
+      let counterSnap = await getDoc(counterRef);
+      
+      if (!counterSnap.exists()) {
+        await setDoc(counterRef, { preventive: 0, corrective: 0 });
+        counterSnap = await getDoc(counterRef);
+      }
+      
+      const count = (counterSnap.data()?.[type] || 0) + 1;
+      const prefix = type === 'preventive' ? 'RPP' : 'RPC';
+      const datePart = format(new Date(), 'yyMM');
+      const paddedCount = count.toString().padStart(4, '0');
+      const newNumber = `${prefix}-${datePart}-${paddedCount}`;
+      
+      if (isMounted.current) {
+        setReportNumber(newNumber);
+        setFormData(prev => ({ ...prev, reportNumber: newNumber }));
+      }
+    } catch (error) {
+      console.error("Error generating report number:", error);
+      // Fallback to timestamp-based number if Firestore fails
+      const prefix = type === 'preventive' ? 'RPP' : 'RPC';
+      const fallback = `${prefix}-${format(new Date(), 'yyMMdd-HHmm')}`;
+      if (isMounted.current) {
+        setReportNumber(fallback);
+        setFormData(prev => ({ ...prev, reportNumber: fallback }));
+      }
     }
-
-    const prefix = type === 'preventive' ? 'RPP' : 'RPC';
-    const datePart = format(new Date(), 'yyMM');
-    const paddedCount = count.toString().padStart(4, '0');
-    const newNumber = `${prefix}-${datePart}-${paddedCount}`;
-    setReportNumber(newNumber);
-    setFormData(prev => ({ ...prev, reportNumber: newNumber }));
   };
 
   const handleImproveAll = async () => {
@@ -125,8 +146,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
     
     setLoading(true);
     const improved = await improveAllTechnicalTexts(fieldsToImprove);
-    setFormData(prev => ({ ...prev, ...improved }));
-    setLoading(false);
+    if (isMounted.current) {
+      setFormData(prev => ({ ...prev, ...improved }));
+      setLoading(false);
+    }
   };
 
   const addSparePart = () => {
@@ -188,30 +211,82 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
 
     setLoading(true);
     try {
-      // Increment counter robustly
-      const counterRef = doc(db, 'counters', 'reports');
-      await setDoc(counterRef, {
-        [reportType]: increment(1)
-      }, { merge: true });
-
-      // Save report
-      const reportData = {
-        ...formData,
-        reportNumber,
-        type: reportType,
-        createdAt: new Date().toISOString()
-      };
+      // 1. Prepare data and uppercase fields
+      const excludedFields = ['type', 'finalStatus', 'description', 'technicalDiagnosis', 'workPerformed', 'finalDiagnosis', 'observations', 'photos', 'verification', 'spareParts', 'delivery', 'createdAt', 'reportNumber', 'id'];
       
-      console.log("Saving report data:", reportData);
-      await addDoc(collection(db, 'reports'), reportData);
+      const processedData = { ...formData };
+      
+      // Uppercase top-level string fields
+      Object.keys(processedData).forEach(key => {
+        const k = key as keyof Report;
+        if (!excludedFields.includes(k) && typeof processedData[k] === 'string') {
+          (processedData[k] as any) = (processedData[k] as string).toUpperCase();
+        }
+      });
+
+      // Uppercase delivery fields
+      if (processedData.delivery) {
+        processedData.delivery = {
+          ...processedData.delivery,
+          senderName: (processedData.delivery.senderName || '').toUpperCase(),
+          senderRole: (processedData.delivery.senderRole || '').toUpperCase(),
+          receiverName: (processedData.delivery.receiverName || '').toUpperCase(),
+          receiverRole: (processedData.delivery.receiverRole || '').toUpperCase(),
+        };
+      }
+
+      // Uppercase spare parts fields
+      if (processedData.spareParts) {
+        processedData.spareParts = processedData.spareParts.map(part => ({
+          ...part,
+          description: (part.description || '').toUpperCase(),
+          provider: (part.provider || '').toUpperCase(),
+          partNumber: (part.partNumber || '').toUpperCase(),
+          reference: (part.reference || '').toUpperCase(),
+        }));
+      }
+
+      // 2. Format report number
+      // We keep the reportNumber as the tracking number (short version)
+      // The user wants the long version only for the PDF filename reference.
+      const baseNumber = reportNumber.split('-').slice(0, 3).join('-');
+
+      const reportData = {
+        ...processedData,
+        reportNumber: baseNumber,
+        type: reportType,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (initialData?.id) {
+        // Update existing report
+        await updateDoc(doc(db, 'reports', initialData.id), reportData);
+      } else {
+        // New report
+        // Increment counter only for new reports
+        const counterRef = doc(db, 'counters', 'reports');
+        await setDoc(counterRef, {
+          [reportType]: increment(1)
+        }, { merge: true });
+
+        await addDoc(collection(db, 'reports'), {
+          ...reportData,
+          uid: auth.currentUser?.uid,
+          createdAt: new Date().toISOString()
+        });
+      }
 
       alert("Reporte guardado exitosamente");
       onComplete();
     } catch (error: any) {
       console.error("Error saving report:", error);
-      alert(`Error al guardar el reporte: ${error.message || 'Error desconocido'}`);
+      if (isMounted.current) {
+        alert(`Error al guardar el reporte: ${error.message || 'Error desconocido'}`);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -223,14 +298,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
     setLoading(true);
     
     try {
-      console.log("Generating PDF for report:", reportNumber);
+      const baseNumber = reportNumber.split('-').slice(0, 3).join('-');
+      const equipment = (formData.equipment || '').trim().toUpperCase();
+      const serial = (formData.serial || '').trim().toUpperCase();
+      
+      let fileName = `Reporte_${baseNumber}`;
+      if (equipment) fileName += `_${equipment}`;
+      if (serial) fileName += `_${serial}`;
+      fileName += '.pdf';
+
+      console.log("Generating PDF:", fileName);
       
       const element = reportRef.current;
       
       // Options for html2pdf
       const opt = {
         margin: [10, 10, 10, 10] as [number, number, number, number],
-        filename: `Reporte_${reportNumber}.pdf`,
+        filename: fileName,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
           scale: 2,
@@ -244,7 +328,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
             const el = clonedDoc.getElementById('report-to-pdf');
             if (el) {
               // A4 at 96dpi is 794px wide.
+              // We use border-box to ensure padding doesn't push width beyond 794px
               el.style.width = '794px';
+              el.style.boxSizing = 'border-box';
               el.style.margin = '0';
               el.style.padding = '30px';
               el.style.boxShadow = 'none';
@@ -256,21 +342,33 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
             // Apply colors and fix oklch
             const allElements = clonedDoc.getElementsByTagName('*');
             const header = clonedDoc.querySelector('.report-header');
-            
-            for (let i = 0; i < allElements.length; i++) {
+                        for (let i = 0; i < allElements.length; i++) {
               const element = allElements[i] as HTMLElement;
+              const style = window.getComputedStyle(element);
               
               // Ensure everything is visible and breaks correctly
               // Remove overflow-hidden that might be clipping text
               element.style.overflow = 'visible';
               element.style.boxSizing = 'border-box';
               element.style.wordBreak = 'break-word';
+              element.style.height = 'auto'; // Ensure height can grow
+
+              // Fix for long paragraphs in whitespace-pre-wrap containers
+              if (style.whiteSpace.includes('pre')) {
+                element.style.whiteSpace = 'pre-wrap';
+              }
 
               // Apply page break avoidance to sections
               if (element.classList.contains('report-section') || element.classList.contains('photo-item')) {
                 element.style.pageBreakInside = 'avoid';
                 element.style.breakInside = 'avoid';
-                element.style.display = 'block';
+                
+                // Only set display to block if it's not already a flex or grid
+                // This preserves the layout of the header and other grid sections
+                if (!style.display.includes('grid') && !style.display.includes('flex')) {
+                  element.style.display = 'block';
+                }
+                
                 element.style.position = 'relative';
                 
                 if (element.classList.contains('report-section')) {
@@ -298,7 +396,6 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
                 element.style.marginTop = '2px';
               }
 
-              const style = window.getComputedStyle(element);
               const isHeader = header && (header.contains(element) || element === header);
 
               let bg = style.backgroundColor;
@@ -376,9 +473,13 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
       console.log("PDF saved successfully");
     } catch (error: any) {
       console.error("Error generating PDF:", error);
-      alert(`Error al generar PDF: ${error.message || 'Error desconocido'}`);
+      if (isMounted.current) {
+        alert(`Error al generar PDF: ${error.message || 'Error desconocido'}`);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -675,12 +776,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({ onComplete, initialData,
                 onChange={e => setFormData(prev => ({ ...prev, invima: e.target.value }))}
                 className="w-full border-none p-0 focus:ring-0 text-[10px] bg-transparent font-semibold"
               >
-                    <option value="">pendiente!...</option>
+                    <option value="">Seleccione...</option>
                     <option value="NO PRESENTA">AGITADOR DE PLAQUETAS</option>
                     <option value="INVIMA 2011DM-0008086">AUTOCLAVE</option>
                     <option value="NO PRESENTA">BAÑO SEROLÓGICO</option>
                     <option value="NO PRESENTA">BÁSCULA</option>
-                    <option value="INVIMA 2012EBC-0008723">BOMBAS DE INFUSIÓN</option>
+                    <option value="INVIMA 2012EBC-0008723 - INVIMA 2022EBC-0008723-R1">BOMBAS DE INFUSIÓN</option>
                     <option value="INVIMA 2015DM-0012713">CAMA</option>
                     <option value="INVIMA 2015DM-0013474">CAMILLA</option>
                     <option value="NO APLICA">CENTRÍFUGAS</option>

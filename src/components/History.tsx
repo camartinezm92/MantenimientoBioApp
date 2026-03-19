@@ -1,19 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  getDocs, 
+  where, 
+  deleteDoc, 
+  doc, 
+  setDoc,
+  writeBatch 
+} from 'firebase/firestore';
 import { Report } from '../types';
-import { Search, FileText, Download, Eye, Calendar, Tag } from 'lucide-react';
+import { Search, FileText, Download, Eye, Calendar, Tag, Trash2, Edit } from 'lucide-react';
 import { format } from 'date-fns';
+import { ConfirmModal } from './ConfirmModal';
 
 interface HistoryProps {
   onViewReport: (report: Report) => void;
   onDownloadReport: (report: Report) => void;
+  onEditReport: (report: Report) => void;
 }
 
-export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport }) => {
+export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport, onEditReport }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     fetchReports();
@@ -71,6 +94,59 @@ export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport
     document.body.removeChild(link);
   };
 
+  const clearAllData = async () => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Borrar todos los reportes?',
+      message: 'Esta acción eliminará permanentemente todos los reportes y reiniciará los contadores. No se puede deshacer.',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          // Delete all reports
+          const reportsSnapshot = await getDocs(collection(db, 'reports'));
+          const batch = writeBatch(db);
+          reportsSnapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+          });
+          await batch.commit();
+
+          // Reset counters
+          const counterRef = doc(db, 'counters', 'reports');
+          await setDoc(counterRef, { preventive: 0, corrective: 0 });
+
+          alert("Todos los datos han sido borrados exitosamente.");
+          fetchReports();
+        } catch (error: any) {
+          console.error("Error clearing data:", error);
+          alert(`Error al borrar los datos: ${error.message || 'Error desconocido'}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  const deleteReport = async (reportId: string, reportNumber: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Eliminar reporte?',
+      message: `¿Está seguro de que desea eliminar el reporte ${reportNumber}? Esta acción no se puede deshacer.`,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await deleteDoc(doc(db, 'reports', reportId));
+          alert("Reporte eliminado exitosamente.");
+          fetchReports();
+        } catch (error: any) {
+          console.error("Error deleting report:", error);
+          alert(`Error al eliminar el reporte: ${error.message || 'Error desconocido'}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -78,12 +154,20 @@ export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport
           <h1 className="text-2xl font-bold text-gray-900">Historial de Mantenimientos</h1>
           <p className="text-gray-500 text-sm">Consulte y descargue reportes realizados anteriormente.</p>
         </div>
-        <button
-          onClick={downloadHistoryCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all shadow-md"
-        >
-          <Download size={18} /> Descargar Lista (CSV)
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={clearAllData}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-all shadow-md"
+          >
+            <Trash2 size={18} /> Borrar Todo
+          </button>
+          <button
+            onClick={downloadHistoryCSV}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all shadow-md"
+          >
+            <Download size={18} /> Descargar Lista (CSV)
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -147,6 +231,13 @@ export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport
                 </span>
                 <div className="flex gap-2">
                   <button 
+                    onClick={() => onEditReport(report)}
+                    className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" 
+                    title="Editar Reporte"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button 
                     onClick={() => onViewReport(report)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                     title="Ver Detalle"
@@ -160,12 +251,27 @@ export const History: React.FC<HistoryProps> = ({ onViewReport, onDownloadReport
                   >
                     <Download size={18} />
                   </button>
+                  <button 
+                    onClick={() => report.id && deleteReport(report.id, report.reportNumber)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                    title="Eliminar Reporte"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+      />
     </div>
   );
 };

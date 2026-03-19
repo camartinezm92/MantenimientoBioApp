@@ -59,4 +59,5 @@ export interface Report {
   };
   photos: string[];
   createdAt: string;
+  updatedAt?: string;
 }

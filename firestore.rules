@@ -9,14 +9,17 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         request.auth.token.email == "Camartinezm92@gmail.com");
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         request.auth.token.email == "Camartinezm92@gmail.com" ||
+         request.auth.token.email == "camartinezm92@gmail.com");
     }
 
     match /reports/{reportId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.uid == request.auth.uid);
     }
 
     match /counters/{counterId} {

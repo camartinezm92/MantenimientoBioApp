@@ -4,9 +4,11 @@ import { History } from './components/History';
 import { PlusCircle, History as HistoryIcon, ClipboardList, LogIn, LogOut, User } from 'lucide-react';
 import { auth } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { Report } from './types';
 
-type View = 'new' | 'history' | 'view';
+type View = 'new' | 'history' | 'view' | 'edit';
 
 export default function App() {
   const [view, setView] = useState<View>('new');
@@ -16,9 +18,26 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
+
+      if (user) {
+        // Sync user profile to Firestore
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          const isAdmin = user.email?.toLowerCase() === 'camartinezm92@gmail.com';
+          await setDoc(userRef, {
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            role: isAdmin ? 'admin' : 'user',
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -42,6 +61,12 @@ export default function App() {
     setSelectedReport(report);
     setAutoDownload(true);
     setView('view');
+  };
+
+  const handleEditReport = (report: Report) => {
+    setSelectedReport(report);
+    setAutoDownload(false);
+    setView('edit');
   };
 
   const handleNewReport = () => {
@@ -153,10 +178,20 @@ export default function App() {
             isViewOnly={true}
             autoDownload={autoDownload}
           />
+        ) : view === 'edit' ? (
+          <ReportForm 
+            key={selectedReport?.id || 'edit-report'}
+            initialData={selectedReport || undefined} 
+            onComplete={() => {
+              setView('history');
+              setSelectedReport(null);
+            }} 
+          />
         ) : (
           <History 
             onViewReport={handleViewReport} 
             onDownloadReport={handleDownloadReport}
+            onEditReport={handleEditReport}
           />
         )}
       </main>
